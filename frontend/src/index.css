@@ -359,3 +359,20 @@ body::after {
   vertical-align: text-bottom;
   animation: cursor-blink 1s step-end infinite;
 }
+
+/* ── Social links ──────────────────────────────── */
+.social-link {
+  color: var(--text-mid);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, transform 0.15s ease;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.social-link:hover {
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+

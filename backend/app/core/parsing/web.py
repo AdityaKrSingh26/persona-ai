@@ -14,6 +14,14 @@ async def scrape_url(url: str, timeout: float = 30.0) -> str:
             f"recommendations, and professional activities on LinkedIn using this link."
         )
 
+    if "medium.com" in url.lower():
+        return (
+            f"Medium Blog URL: {url}\n"
+            f"This is Aditya's (Aditya Kumar Singh) Medium blog page, containing articles, tutorials, "
+            f"and posts written by Aditya on software engineering, web development, AI engineering, "
+            f"and technology solutions."
+        )
+
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }

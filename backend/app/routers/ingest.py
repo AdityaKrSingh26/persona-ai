@@ -83,8 +83,8 @@ async def ingest_url(
     logger.info("[ingest] ingest url | url=%s label=%s", url_str, body.label)
 
     # Pre-flight reachability check before opening a transaction
-    is_linkedin = "linkedin.com" in url_str.lower()
-    if not is_linkedin:
+    is_bypassed = any(d in url_str.lower() for d in ["linkedin.com", "medium.com"])
+    if not is_bypassed:
         try:
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"

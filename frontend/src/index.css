@@ -376,3 +376,17 @@ body::after {
   transform: translateY(-1px);
 }
 
+/* ── Responsive helpers ────────────────────────── */
+@media (max-width: 767px) {
+  .desktop-only {
+    display: none !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+

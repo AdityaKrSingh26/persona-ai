@@ -121,6 +121,7 @@ export const HomePage = () => {
 
         {/* Social & Professional Links Dock */}
         <div
+          className="desktop-only"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -294,12 +295,104 @@ export const HomePage = () => {
       {/* Footer */}
       <footer
         style={{
-          padding: '16px 40px',
+          padding: '24px 40px',
           borderTop: '1px solid var(--border)',
           display: 'flex',
-          justifyContent: 'center',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '16px',
         }}
       >
+        {/* Mobile Links Dock */}
+        <div
+          className="mobile-only"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '20px',
+            flexWrap: 'wrap',
+            marginBottom: '4px',
+          }}
+        >
+          {/* Social Profiles */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <a
+              href="https://github.com/AdityaKrSingh26"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="social-link"
+              title="GitHub"
+              aria-label="GitHub"
+            >
+              <GitHubIcon />
+            </a>
+            <a
+              href="https://www.linkedin.com/in/adityakrsingh26/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="social-link"
+              title="LinkedIn"
+              aria-label="LinkedIn"
+            >
+              <LinkedInIcon />
+            </a>
+            <a
+              href="https://myportfolio-three-tawny.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="social-link"
+              title="Personal Portfolio"
+              aria-label="Personal Portfolio"
+            >
+              <PortfolioIcon />
+            </a>
+            <a
+              href="mailto:adityakrsingh2604@gmail.com"
+              className="social-link"
+              title="Email"
+              aria-label="Email"
+            >
+              <EmailIcon />
+            </a>
+          </div>
+
+          <div style={{ width: '1px', height: '16px', background: 'var(--border)' }} />
+
+          {/* Download Resume Button */}
+          <a
+            href="https://drive.google.com/file/d/18RYvS-VwXg3FCtEknUGLp_A4oiAr2xHK/view"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-outline"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '11px',
+              padding: '6px 14px',
+              textDecoration: 'none',
+              borderRadius: '2px',
+            }}
+          >
+            <ResumeIcon />
+            <span>Resume</span>
+          </a>
+
+          <div style={{ width: '1px', height: '16px', background: 'var(--border)' }} />
+
+          {/* Admin Dashboard Lock Link */}
+          <Link
+            to="/admin"
+            className="social-link"
+            title="Admin Dashboard"
+            aria-label="Admin Dashboard"
+            style={{ display: 'flex', alignItems: 'center' }}
+          >
+            <AdminIcon />
+          </Link>
+        </div>
+
         <span className="label" style={{ color: 'var(--text-muted)' }}>
           Powered by Vapi · RAG · pgvector
         </span>

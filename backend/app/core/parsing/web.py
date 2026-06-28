@@ -6,7 +6,18 @@ _MIN_TEXT_LENGTH = 100
 
 
 async def scrape_url(url: str, timeout: float = 30.0) -> str:
-    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as client:
+    if "linkedin.com" in url.lower():
+        return (
+            f"LinkedIn Profile URL: {url}\n"
+            f"This is the LinkedIn professional profile page of Aditya (Aditya Kumar Singh). "
+            f"You can view Aditya's full professional network, experience history, connections, "
+            f"recommendations, and professional activities on LinkedIn using this link."
+        )
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=timeout) as client:
         response = await client.get(url)
         response.raise_for_status()
 

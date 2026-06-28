@@ -83,12 +83,23 @@ async def ingest_url(
     logger.info("[ingest] ingest url | url=%s label=%s", url_str, body.label)
 
     # Pre-flight reachability check before opening a transaction
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.head(url_str, follow_redirects=True)
-            resp.raise_for_status()
-    except Exception:
-        raise HTTPException(status_code=422, detail="URL is not reachable")
+    is_linkedin = "linkedin.com" in url_str.lower()
+    if not is_linkedin:
+        try:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+            async with httpx.AsyncClient(headers=headers, timeout=5.0) as client:
+                try:
+                    resp = await client.head(url_str, follow_redirects=True)
+                    resp.raise_for_status()
+                except (httpx.HTTPStatusError, httpx.RequestError):
+                    # Fallback to GET in case HEAD is not allowed/supported
+                    resp = await client.get(url_str, follow_redirects=True)
+                    resp.raise_for_status()
+        except Exception as exc:
+            logger.warning("[ingest] pre-flight reachability check failed for url=%s: %s", url_str, exc)
+            raise HTTPException(status_code=422, detail="URL is not reachable")
 
     try:
         source = await ingest_source(

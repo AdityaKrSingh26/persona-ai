@@ -1,8 +1,12 @@
+import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useIngest } from '../hooks/useIngest';
+import { useMessages } from '../hooks/useMessages';
 import { AddUrlForm } from '../components/admin/AddUrlForm';
 import { ResumeUploader } from '../components/admin/ResumeUploader';
 import { SourceCard } from '../components/admin/SourceCard';
+import { Spinner } from '../components/common/Spinner';
+import type { ContactMessage } from '../types/message';
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <section style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -14,9 +18,49 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
   </section>
 );
 
+const MessageCard = ({ message, onRemove }: { message: ContactMessage; onRemove: (id: string) => Promise<void> }) => {
+  const [deleting, setDeleting] = useState(false);
+  const handleRemove = async () => {
+    setDeleting(true);
+    await onRemove(message.id);
+    setDeleting(false);
+  };
+  
+  return (
+    <div className="source-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', animation: 'fade-up 0.2s ease', position: 'relative' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>
+            {message.visitor_name}
+          </span>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            {message.visitor_email}
+          </span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+            {new Date(message.created_at).toLocaleString()}
+          </span>
+          {deleting ? (
+            <Spinner />
+          ) : (
+            <button className="btn btn-ghost" style={{ fontSize: '10px', color: 'var(--error)', padding: '2px 6px', opacity: 0.7 }} onClick={handleRemove}>
+              Delete
+            </button>
+          )}
+        </div>
+      </div>
+      <div style={{ fontSize: '12px', color: 'var(--text-mid)', background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderLeft: '2px solid var(--accent)', borderRadius: '2px', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
+        {message.message}
+      </div>
+    </div>
+  );
+};
+
 export const AdminPage = () => {
   const { logout } = useAuth();
   const { sources, busy, busyId, error, addUrl, uploadResume, reindex, remove } = useIngest();
+  const { messages, remove: removeMessage, error: messageError } = useMessages();
 
   return (
     <div
@@ -102,7 +146,21 @@ export const AdminPage = () => {
           </Section>
         )}
 
-        {error && (
+        {messages.length > 0 && (
+          <Section title="Recruiter Messages">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {messages.map((msg) => (
+                <MessageCard
+                  key={msg.id}
+                  message={msg}
+                  onRemove={removeMessage}
+                />
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {(error || messageError) && (
           <div
             style={{
               padding: '12px 16px',
@@ -114,7 +172,7 @@ export const AdminPage = () => {
               animation: 'fade-in 0.2s ease',
             }}
           >
-            {error}
+            {error || messageError}
           </div>
         )}
       </main>

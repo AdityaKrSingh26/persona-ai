@@ -83,3 +83,36 @@ async def create_booking(
             raise ValueError(msg)
         resp.raise_for_status()
         return resp.json()
+
+
+async def get_available_slots(
+    start_date: str,
+    end_date: str,
+    timezone: str = "Asia/Kolkata",
+) -> dict:
+    """
+    Fetch slot availability from Cal.com.
+    start_date and end_date must be ISO 8601 strings, e.g. "2026-07-15T00:00:00Z"
+    """
+    iana_tz = _normalize_tz(timezone)
+    headers = {
+        "Authorization": f"Bearer {settings.cal_api_key}",
+        "cal-api-version": "2024-09-04",
+        "Content-Type": "application/json",
+    }
+    params = {
+        "eventTypeId": settings.cal_event_type_id,
+        "start": start_date,
+        "end": end_date,
+        "timeZone": iana_tz,
+    }
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.get(
+            f"{CAL_API_BASE}/slots",
+            headers=headers,
+            params=params,
+        )
+        resp.raise_for_status()
+        return resp.json()
+

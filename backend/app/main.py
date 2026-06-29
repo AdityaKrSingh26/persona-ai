@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import configure_logging, settings
-from app.routers import auth, health, ingest, sources, tools
+from app.routers import auth, health, ingest, messages, sources, tools
 
 # ── configure logging FIRST before any other logger is used ──────────────────
 configure_logging()
@@ -111,4 +111,5 @@ app.include_router(auth.router)
 app.include_router(sources.router)
 app.include_router(ingest.router)
 app.include_router(tools.router)
+app.include_router(messages.router)
 app.include_router(health.router)

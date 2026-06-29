@@ -10,15 +10,22 @@ from app.dependencies.providers import (
     get_chunk_repo,
     get_embeddings_client,
     get_github_client,
+    get_message_repo,
     get_session_repo,
 )
 from app.dependencies.vapi_auth import require_vapi_secret
-from app.integrations.cal import create_booking
+from app.integrations.cal import create_booking, get_available_slots
 from app.integrations.embeddings_api import EmbeddingsClient
 from app.integrations.github import GitHubClient
 from app.repositories.chunk_repository import ChunkRepository
+from app.repositories.message_repository import MessageRepository
 from app.repositories.session_repository import SessionRepository
-from app.schemas import AppointmentRequest, GitHubRequest
+from app.schemas import (
+    AppointmentRequest,
+    ContactMessageRequest,
+    GitHubRequest,
+    SlotCheckRequest,
+)
 
 router = APIRouter(prefix="/tools", tags=["tools"])
 logger = logging.getLogger(__name__)
@@ -43,15 +50,16 @@ def _vapi_error(tool_call_id: str, error: str) -> dict:
 
 def _parse_vapi_body(body: dict) -> tuple[str, dict]:
     """Return (tool_call_id, args) from either the Vapi call envelope or the flat test-UI body."""
-    tool_call = (body.get("message", {}).get("toolCallList") or [{}])[0]
-    if tool_call:
-        tool_call_id = tool_call.get("id", "unknown")
-        args = tool_call.get("function", {}).get("arguments", {})
-    else:
-        # Vapi test UI sends a flat body — treat the whole body as args
-        tool_call_id = "unknown"
-        args = body
-    return tool_call_id, args
+    message_val = body.get("message")
+    if isinstance(message_val, dict):
+        tool_call = (message_val.get("toolCallList") or [{}])[0]
+        if tool_call:
+            tool_call_id = tool_call.get("id", "unknown")
+            args = tool_call.get("function", {}).get("arguments", {})
+            return tool_call_id, args
+
+    # Vapi test UI or flat payload sends a flat body — treat the whole body as args
+    return "unknown", body
 
 
 @router.post("/retrieve")
@@ -107,7 +115,7 @@ async def tool_github(
         return res
 
     lines = [
-        f"{r['name']}: {r.get('description', 'No description')} ({r.get('language', 'N/A')}) stars:{r.get('stars', 0)}"
+        f"{r['name']}: {r.get('description') or 'No description'} ({r.get('language') or 'N/A'}) stars:{r.get('stars') or 0}"
         for r in repos
     ]
     res = _vapi_result(tool_call_id, " | ".join(lines))
@@ -144,6 +152,137 @@ async def tool_appointment(
         logger.exception("[tools] appointment failed | id=%s", tool_call_id)
         res = _vapi_error(tool_call_id, f"Failed to book meeting: {e}")
         logger.info("[tools] appointment response: %r", res)
+        return res
+
+
+def _format_slots(slots_data: dict, target_tz_str: str) -> str:
+    from zoneinfo import ZoneInfo
+    from app.integrations.cal import _normalize_tz
+    iana_tz = _normalize_tz(target_tz_str)
+    
+    try:
+        tz = ZoneInfo(iana_tz)
+    except Exception:
+        tz = ZoneInfo("Asia/Kolkata")
+        
+    formatted = []
+    data = slots_data.get("data", {})
+    for day, slots in data.items():
+        if not slots:
+            continue
+        day_slots = []
+        for slot in slots:
+            start_str = slot.get("start")
+            if not start_str:
+                continue
+            dt_utc = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+            dt_local = dt_utc.astimezone(tz)
+            time_str = dt_local.strftime("%I:%M %p").lstrip("0")
+            day_slots.append(time_str)
+            
+        if day_slots:
+            try:
+                day_dt = datetime.strptime(day, "%Y-%m-%d")
+                day_name = day_dt.strftime("%A, %B %d")
+            except Exception:
+                day_name = day
+            times_joined = ", ".join(day_slots[:-1]) + (", and " + day_slots[-1] if len(day_slots) > 1 else day_slots[0] if day_slots else "")
+            formatted.append(f"On {day_name}, available times are: {times_joined}.")
+            
+    if not formatted:
+        return "No slots are available on this date."
+        
+    return " ".join(formatted)
+
+
+@router.post("/slots")
+async def tool_slots(
+    request: Request,
+    body: dict,
+    _: None = Depends(require_vapi_secret),
+):
+    logger.info("[tools] slots request headers: %r", dict(request.headers))
+    logger.info("[tools] slots request body: %r", body)
+    tool_call_id, args = _parse_vapi_body(body)
+
+    date_str = args.get("date")
+    timezone_str = args.get("timezone", "Asia/Kolkata")
+
+    logger.info("[tools] slots | id=%s date=%s tz=%s", tool_call_id, date_str, timezone_str)
+
+    if not date_str:
+        res = _vapi_error(tool_call_id, "No date provided.")
+        logger.info("[tools] slots response: %r", res)
+        return res
+
+    try:
+        req = SlotCheckRequest(**args)
+        
+        from app.integrations.cal import _normalize_tz
+        iana_tz = _normalize_tz(req.timezone)
+        
+        if "T" in req.date:
+            date_clean = req.date.split("T")[0]
+        else:
+            date_clean = req.date
+            
+        start_date = f"{date_clean}T00:00:00Z"
+        end_date = f"{date_clean}T23:59:59Z"
+        
+        slots_data = await get_available_slots(start_date, end_date, req.timezone)
+        formatted_message = _format_slots(slots_data, req.timezone)
+        
+        res = _vapi_result(tool_call_id, formatted_message)
+        logger.info("[tools] slots response: %r", res)
+        return res
+    except Exception as e:
+        logger.exception("[tools] slots failed | id=%s", tool_call_id)
+        res = _vapi_error(tool_call_id, f"Failed to check slots: {e}")
+        logger.info("[tools] slots response: %r", res)
+        return res
+
+
+@router.post("/contact")
+async def tool_contact(
+    request: Request,
+    body: dict,
+    _: None = Depends(require_vapi_secret),
+    db: AsyncSession = Depends(get_db),
+    message_repo: MessageRepository = Depends(get_message_repo),
+):
+    logger.info("[tools] contact request headers: %r", dict(request.headers))
+    logger.info("[tools] contact request body: %r", body)
+    tool_call_id, args = _parse_vapi_body(body)
+
+    visitor_name = args.get("visitor_name")
+    visitor_email = args.get("visitor_email")
+    message = args.get("message")
+
+    logger.info("[tools] contact | id=%s visitor=%s email=%s", tool_call_id, visitor_name, visitor_email)
+
+    if not visitor_name or not visitor_email or not message:
+        res = _vapi_error(tool_call_id, "Missing visitor name, email, or message.")
+        logger.info("[tools] contact response: %r", res)
+        return res
+
+    try:
+        req = ContactMessageRequest(**args)
+        await message_repo.create(
+            visitor_name=req.visitor_name,
+            visitor_email=str(req.visitor_email),
+            message=req.message,
+        )
+        await db.commit()
+        res = _vapi_result(
+            tool_call_id,
+            f"Message saved successfully! I have let Aditya know, and he will get back to you at {req.visitor_email}."
+        )
+        logger.info("[tools] contact response: %r", res)
+        return res
+    except Exception as e:
+        logger.exception("[tools] contact failed | id=%s", tool_call_id)
+        res = _vapi_error(tool_call_id, f"Failed to save message: {e}")
+        logger.info("[tools] contact response: %r", res)
         return res
 
 

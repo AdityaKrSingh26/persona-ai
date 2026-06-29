@@ -27,6 +27,14 @@ def get_session_repo(db: AsyncSession = Depends(get_db)):
     return SessionRepository(db)
 
 
+def get_message_repo(db: AsyncSession = Depends(get_db)):
+    from app.repositories.message_repository import MessageRepository
+    return MessageRepository(db)
+
+
+
+
+
 def get_embeddings_client():
     from app.integrations.embeddings_api import EmbeddingsClient
     from app.config import settings

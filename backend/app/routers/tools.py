@@ -185,15 +185,23 @@ async def tool_appointment(
 
 
 def _format_slots(slots_data: dict, target_tz_str: str) -> str:
+    """Format available slots into a concise, voice-friendly summary.
+
+    Instead of listing every single 30-minute slot (which can be 28+),
+    this returns a short summary with the total count, a handful of
+    representative times spread across the day, and the overall range.
+    This prevents Vapi's LLM from being overwhelmed and skipping the
+    times in its spoken response.
+    """
     from zoneinfo import ZoneInfo
     from app.integrations.cal import _normalize_tz
     iana_tz = _normalize_tz(target_tz_str)
-    
+
     try:
         tz = ZoneInfo(iana_tz)
     except Exception:
         tz = ZoneInfo("Asia/Kolkata")
-        
+
     formatted = []
     data = slots_data.get("data", {})
     for day, slots in data.items():
@@ -208,19 +216,49 @@ def _format_slots(slots_data: dict, target_tz_str: str) -> str:
             dt_local = dt_utc.astimezone(tz)
             time_str = dt_local.strftime("%I:%M %p").lstrip("0")
             day_slots.append(time_str)
-            
-        if day_slots:
-            try:
-                day_dt = datetime.strptime(day, "%Y-%m-%d")
-                day_name = day_dt.strftime("%A, %B %d")
-            except Exception:
-                day_name = day
-            times_joined = ", ".join(day_slots[:-1]) + (", and " + day_slots[-1] if len(day_slots) > 1 else day_slots[0] if day_slots else "")
+
+        if not day_slots:
+            continue
+
+        try:
+            day_dt = datetime.strptime(day, "%Y-%m-%d")
+            day_name = day_dt.strftime("%A, %B %d")
+        except Exception:
+            day_name = day
+
+        total = len(day_slots)
+
+        if total <= 6:
+            # Few enough to list them all
+            times_joined = ", ".join(day_slots[:-1]) + (", and " + day_slots[-1] if total > 1 else day_slots[0])
             formatted.append(f"On {day_name}, available times are: {times_joined}.")
-            
+        else:
+            # Pick ~5 representative slots spread across the day
+            sample_indices = [
+                0,                      # earliest
+                total // 4,             # ~25%
+                total // 2,             # midday
+                3 * total // 4,         # ~75%
+                total - 1,              # latest
+            ]
+            # Deduplicate while preserving order
+            seen = set()
+            samples = []
+            for i in sample_indices:
+                if i not in seen:
+                    seen.add(i)
+                    samples.append(day_slots[i])
+            sample_text = ", ".join(samples[:-1]) + ", and " + samples[-1]
+            formatted.append(
+                f"On {day_name}, there are {total} available slots "
+                f"ranging from {day_slots[0]} to {day_slots[-1]}. "
+                f"Some options include {sample_text}. "
+                f"Slots are available in 30-minute increments."
+            )
+
     if not formatted:
         return "No slots are available on this date."
-        
+
     return " ".join(formatted)
 
 

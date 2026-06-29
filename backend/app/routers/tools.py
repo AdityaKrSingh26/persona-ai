@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.retrieval import retrieve
@@ -36,7 +36,7 @@ def _vapi_result(tool_call_id: str, result: str) -> dict:
 def _vapi_error(tool_call_id: str, error: str) -> dict:
     return {
         "results": [
-            {"toolCallId": tool_call_id, "error": error.replace("\n", " ")}
+            {"toolCallId": tool_call_id, "result": f"Error: {error.replace('\n', ' ')}"}
         ]
     }
 
@@ -56,33 +56,45 @@ def _parse_vapi_body(body: dict) -> tuple[str, dict]:
 
 @router.post("/retrieve")
 async def tool_retrieve(
+    request: Request,
     body: dict,
     _: None = Depends(require_vapi_secret),
     chunk_repo: ChunkRepository = Depends(get_chunk_repo),
     embeddings_client: EmbeddingsClient = Depends(get_embeddings_client),
 ):
+    logger.info("[tools] retrieve request headers: %r", dict(request.headers))
+    logger.info("[tools] retrieve request body: %r", body)
     tool_call_id, args = _parse_vapi_body(body)
     query = args.get("query", "")
 
     logger.info("[tools] retrieve | id=%s query=%r", tool_call_id, query)
 
     if not query:
-        return _vapi_error(tool_call_id, "No query provided.")
+        res = _vapi_error(tool_call_id, "No query provided.")
+        logger.info("[tools] retrieve response: %r", res)
+        return res
 
     chunks = await retrieve(chunk_repo, embeddings_client, query, top_k=5)
     if not chunks:
-        return _vapi_result(tool_call_id, "No relevant information found in the knowledge base.")
+        res = _vapi_result(tool_call_id, "No relevant information found in the knowledge base.")
+        logger.info("[tools] retrieve response: %r", res)
+        return res
 
     context = " --- ".join(f"[{row.label}] {row.content}" for row in chunks)
-    return _vapi_result(tool_call_id, context)
+    res = _vapi_result(tool_call_id, context)
+    logger.info("[tools] retrieve response: %r", res)
+    return res
 
 
 @router.post("/github")
 async def tool_github(
+    request: Request,
     body: dict,
     _: None = Depends(require_vapi_secret),
     gh_client: GitHubClient = Depends(get_github_client),
 ):
+    logger.info("[tools] github request headers: %r", dict(request.headers))
+    logger.info("[tools] github request body: %r", body)
     tool_call_id, args = _parse_vapi_body(body)
     query = args.get("query")
 
@@ -90,20 +102,27 @@ async def tool_github(
 
     repos = await gh_client.fetch_repos(query=query, limit=10)
     if not repos:
-        return _vapi_result(tool_call_id, "No repositories found.")
+        res = _vapi_result(tool_call_id, "No repositories found.")
+        logger.info("[tools] github response: %r", res)
+        return res
 
     lines = [
         f"{r['name']}: {r.get('description', 'No description')} ({r.get('language', 'N/A')}) stars:{r.get('stars', 0)}"
         for r in repos
     ]
-    return _vapi_result(tool_call_id, " | ".join(lines))
+    res = _vapi_result(tool_call_id, " | ".join(lines))
+    logger.info("[tools] github response: %r", res)
+    return res
 
 
 @router.post("/appointment")
 async def tool_appointment(
+    request: Request,
     body: dict,
     _: None = Depends(require_vapi_secret),
 ):
+    logger.info("[tools] appointment request headers: %r", dict(request.headers))
+    logger.info("[tools] appointment request body: %r", body)
     tool_call_id, args = _parse_vapi_body(body)
 
     logger.info("[tools] appointment | id=%s visitor=%s", tool_call_id, args.get("visitor_name"))
@@ -118,25 +137,34 @@ async def tool_appointment(
             timezone=req.timezone,
         )
         booking_url = result.get("data", {}).get("meetingUrl") or "https://cal.com/adityakrsingh/30min"
-        return _vapi_result(tool_call_id, f"Meeting booked! Join link: {booking_url}. A confirmation has been sent to {req.visitor_email}.")
+        res = _vapi_result(tool_call_id, f"Meeting booked! Join link: {booking_url}. A confirmation has been sent to {req.visitor_email}.")
+        logger.info("[tools] appointment response: %r", res)
+        return res
     except Exception as e:
         logger.exception("[tools] appointment failed | id=%s", tool_call_id)
-        return _vapi_error(tool_call_id, f"Failed to book meeting: {e}")
+        res = _vapi_error(tool_call_id, f"Failed to book meeting: {e}")
+        logger.info("[tools] appointment response: %r", res)
+        return res
 
 
 @router.post("/session")
 async def tool_session(
+    request: Request,
     body: dict,
     _: None = Depends(require_vapi_secret),
     db: AsyncSession = Depends(get_db),
     session_repo: SessionRepository = Depends(get_session_repo),
 ):
+    logger.info("[tools] session request headers: %r", dict(request.headers))
+    logger.info("[tools] session request body: %r", body)
     event_type = body.get("message", {}).get("type") or body.get("type")
     call = body.get("message", {}).get("call") or body.get("call") or {}
     call_id = call.get("id")
 
     if not call_id:
-        return {"ok": True}
+        res = {"ok": True}
+        logger.info("[tools] session response: %r", res)
+        return res
 
     if event_type == "call-start":
         await session_repo.create(call_id, metadata=body)
@@ -153,4 +181,7 @@ async def tool_session(
     else:
         logger.debug("[tools] vapi event ignored | type=%s call_id=%s", event_type, call_id)
 
-    return {"ok": True}
+    res = {"ok": True}
+    logger.info("[tools] session response: %r", res)
+    return res
+

@@ -1,3 +1,6 @@
+from datetime import datetime, time
+from zoneinfo import ZoneInfo
+
 import httpx
 
 from app.config import settings
@@ -38,6 +41,20 @@ async def create_booking(
     start_time must be ISO 8601 UTC, e.g. "2026-07-15T09:00:00Z"
     """
     iana_tz = _normalize_tz(timezone)
+
+    # Fallback to 6:00 PM (18:00) in the visitor's local timezone if no specific time was provided (exactly midnight)
+    try:
+        dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+        if dt.hour == 0 and dt.minute == 0 and dt.second == 0:
+            try:
+                tz_info = ZoneInfo(iana_tz)
+            except Exception:
+                tz_info = ZoneInfo("Asia/Kolkata")
+            dt_local = datetime.combine(dt.date(), time(18, 0), tzinfo=tz_info)
+            dt_utc = dt_local.astimezone(ZoneInfo("UTC"))
+            start_time = dt_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+    except Exception:
+        pass
 
     async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.post(

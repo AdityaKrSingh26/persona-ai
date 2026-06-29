@@ -24,7 +24,7 @@ class GitHubClient:
     async def fetch_repos(
         self,
         query: Optional[str] = None,
-        limit: int = 10,
+        limit: int = 100,
     ) -> list[dict]:
         for attempt in range(2):
             try:

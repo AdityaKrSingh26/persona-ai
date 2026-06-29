@@ -225,7 +225,7 @@ All tools require the header `x-vapi-secret: <VAPI_SERVER_SECRET>`.
 The voice assistant requires a robust system prompt with detailed guidelines on conversational boundaries, GitHub repository listings, slot checking, and booking fallbacks.
 
 The complete instruction prompt is maintained in its own dedicated document:
-👉 **[SYSTEM_PROMPT.md](file:///d:/Projects/Persona/SYSTEM_PROMPT.md)**
+👉 **[SYSTEM_PROMPT.md](/SYSTEM_PROMPT.md)**
 
 Copy and paste the entire contents of that document into your assistant's system prompt input box.
 

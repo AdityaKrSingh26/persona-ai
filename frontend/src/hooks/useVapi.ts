@@ -28,11 +28,13 @@ export const useVapi = () => {
     vapi.on('call-end', () => setStatus('idle'));
     vapi.on('error', () => { setStatus('error'); setTimeout(() => setStatus('idle'), 3000); });
 
-    // Transcript arrives as final/partial message events
     vapi.on('message', (msg: any) => {
       if (msg?.type !== 'transcript' || msg.transcriptType !== 'final') return;
       const role: TranscriptEntry['role'] = msg.role === 'user' ? 'user' : 'assistant';
-      setTranscript((prev) => [...prev, { role, text: msg.transcript }]);
+      let text = msg.transcript || '';
+      // Correct phonetic transcription errors for Aditya's name
+      text = text.replace(/\ba DTS\b/gi, "Aditya's").replace(/\bDTS\b/gi, "Aditya's");
+      setTranscript((prev) => [...prev, { role, text }]);
     });
 
     return () => {

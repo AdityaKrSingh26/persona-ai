@@ -115,10 +115,30 @@ async def tool_github(
         logger.exception("[tools] github failed to fetch profile")
         total_repos = 0
 
-    repos = await gh_client.fetch_repos(query=query, limit=10)
+    # Clean the query
+    q_clean = (query or "").strip().lower()
+    is_general = q_clean in ["", "all", "repos", "repositories", "list", "github", "none"]
+
+    if is_general:
+        repos = await gh_client.fetch_repos(query=None, limit=100)
+        if not repos:
+            res = _vapi_result(tool_call_id, f"Total public repositories: {total_repos}. No repositories found.")
+            logger.info("[tools] github response: %r", res)
+            return res
+        
+        repo_names = [r["name"] for r in repos]
+        res = _vapi_result(
+            tool_call_id,
+            f"Total public repositories: {total_repos}. Here are the names of all public repositories: "
+            f"{', '.join(repo_names)}. Please ask about any specific repository name if you want to know its details."
+        )
+        logger.info("[tools] github response: %r", res)
+        return res
+
+    repos = await gh_client.fetch_repos(query=query, limit=100)
     if not repos:
         prefix = f"Total public repositories: {total_repos}. " if total_repos > 0 else ""
-        res = _vapi_result(tool_call_id, f"{prefix}No repositories found matching query.")
+        res = _vapi_result(tool_call_id, f"{prefix}No repositories found matching '{query}'.")
         logger.info("[tools] github response: %r", res)
         return res
 
@@ -126,7 +146,7 @@ async def tool_github(
         f"{r['name']}: {r.get('description') or 'No description'} ({r.get('language') or 'N/A'}) stars:{r.get('stars') or 0}"
         for r in repos
     ]
-    prefix = f"Total public repositories: {total_repos}. Here are some of them: " if total_repos > 0 else "Here are some repositories: "
+    prefix = f"Total public repositories: {total_repos}. Here are matching repositories: " if total_repos > 0 else "Here are matching repositories: "
     res = _vapi_result(tool_call_id, prefix + " | ".join(lines))
     logger.info("[tools] github response: %r", res)
     return res

@@ -44,7 +44,7 @@ After retrieval / tool execution:
 * Synthesize the information into a natural response.
 * Do not copy or read retrieved text verbatim.
 
-If the retrieved or returned information does not contain the answer (except for calendar slots or message confirmations, where you should state the slot status or confirm message storage directly), respond:
+If the retrieved or returned information does not contain the answer (except for calendar slots, message confirmations, or GitHub repository queries where you should state the returned repositories and counts directly), respond:
 "I don't have that information available right now."
 
 Do not speculate.

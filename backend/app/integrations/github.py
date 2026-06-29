@@ -47,11 +47,36 @@ class GitHubClient:
         if query:
             q = query.lower()
             # Client-side filter — GitHub's search API would require a separate endpoint and auth scope
-            repos = [
+            exact = [
                 r for r in repos
                 if q in r.get("name", "").lower()
                 or q in (r.get("description") or "").lower()
             ]
+
+            if exact:
+                repos = exact
+            else:
+                # Fuzzy fallback for voice transcription errors
+                # (e.g. "ClearVault"/"Pure Vault" instead of "PeerVault")
+                from difflib import SequenceMatcher
+
+                q_normalized = q.replace(" ", "").replace("-", "").replace("_", "")
+                best_ratio = 0.0
+                best_matches: list[dict] = []
+                for r in repos:
+                    name_normalized = r.get("name", "").lower().replace("-", "").replace("_", "")
+                    ratio = SequenceMatcher(None, q_normalized, name_normalized).ratio()
+                    if ratio > best_ratio:
+                        best_ratio = ratio
+                        best_matches = [r]
+                    elif ratio == best_ratio:
+                        best_matches.append(r)
+
+                # Only accept fuzzy matches above a reasonable threshold
+                if best_ratio >= 0.5:
+                    repos = best_matches
+                else:
+                    repos = []
 
         return [
             {

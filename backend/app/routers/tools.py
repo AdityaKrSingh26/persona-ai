@@ -138,7 +138,7 @@ async def tool_github(
     repos = await gh_client.fetch_repos(query=query, limit=100)
     if not repos:
         prefix = f"Total public repositories: {total_repos}. " if total_repos > 0 else ""
-        res = _vapi_result(tool_call_id, f"{prefix}No repositories found matching '{query}'.")
+        res = _vapi_result(tool_call_id, f"{prefix}No repositories found matching '{query}'. The name may have been misheard. Could you try repeating or spelling the repository name?")
         logger.info("[tools] github response: %r", res)
         return res
 

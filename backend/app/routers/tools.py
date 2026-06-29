@@ -108,9 +108,17 @@ async def tool_github(
 
     logger.info("[tools] github | id=%s query=%r", tool_call_id, query)
 
+    try:
+        profile = await gh_client.fetch_profile()
+        total_repos = profile.get("public_repos", 0)
+    except Exception:
+        logger.exception("[tools] github failed to fetch profile")
+        total_repos = 0
+
     repos = await gh_client.fetch_repos(query=query, limit=10)
     if not repos:
-        res = _vapi_result(tool_call_id, "No repositories found.")
+        prefix = f"Total public repositories: {total_repos}. " if total_repos > 0 else ""
+        res = _vapi_result(tool_call_id, f"{prefix}No repositories found matching query.")
         logger.info("[tools] github response: %r", res)
         return res
 
@@ -118,7 +126,8 @@ async def tool_github(
         f"{r['name']}: {r.get('description') or 'No description'} ({r.get('language') or 'N/A'}) stars:{r.get('stars') or 0}"
         for r in repos
     ]
-    res = _vapi_result(tool_call_id, " | ".join(lines))
+    prefix = f"Total public repositories: {total_repos}. Here are some of them: " if total_repos > 0 else "Here are some repositories: "
+    res = _vapi_result(tool_call_id, prefix + " | ".join(lines))
     logger.info("[tools] github response: %r", res)
     return res
 

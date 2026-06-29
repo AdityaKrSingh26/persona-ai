@@ -65,5 +65,18 @@ class GitHubClient:
             for r in repos
         ]
 
+    async def fetch_profile(self) -> dict:
+        for attempt in range(2):
+            try:
+                response = await self._client.get(f"/users/{self._username}")
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code >= 500 and attempt == 0:
+                    await asyncio.sleep(1)
+                else:
+                    raise
+        return {}
+
     async def aclose(self) -> None:
         await self._client.aclose()
